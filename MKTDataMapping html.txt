@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marketing Analytics Dashboard (Regression Forecast)</title>
+
+  <!-- React (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel for in-browser JSX transpile (OK for demo / GitHub Pages) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: #0b1220;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useState } = React;
+
+    // ---------------- Icons (inline SVG) ----------------
+    const Upload = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+    );
+    const TrendingUp = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+        <polyline points="17 6 23 6 23 12"></polyline>
+      </svg>
+    );
+    const DollarSign = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    );
+    const BarChart3 = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3v18h18"></path>
+        <path d="M18 17V9"></path>
+        <path d="M13 17V5"></path>
+        <path d="M8 17v-3"></path>
+      </svg>
+    );
+    const Download = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    );
+    const AlertCircle = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    );
+    const Brain = () => (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"></path>
+        <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"></path>
+      </svg>
+    );
+
+    // ---------------- Channel mappings ----------------
+    const DEFAULT_CHANNEL_MAPPINGS = {
+      "001": { name: "MMM", color: "#6366f1" },
+      "002": { name: "Partnership", color: "#8b5cf6" },
+      "003": { name: "Affiliate", color: "#ec4899" },
+      "004": { name: "Organic", color: "#10b981" },
+      "005": { name: "Paid Search", color: "#f59e0b" },
+      "006": { name: "Social Media", color: "#3b82f6" },
+      "007": { name: "Display Ads", color: "#ef4444" },
+      "008": { name: "Email Marketing", color: "#06b6d4" },
+      "009": { name: "Content Marketing", color: "#84cc16" },
+      "010": { name: "Influencer", color: "#f97316" },
+      "011": { name: "Events", color: "#14b8a6" },
+      "012": { name: "Direct Mail", color: "#a855f7" },
+      "013": { name: "Other", color: "#64748b" },
+    };
+
+    // ---------------- localStorage wrapper ----------------
+    const storage = {
+      get: async (key) => {
+        try {
+          const value = localStorage.getItem(key);
+          return value ? { key, value } : null;
+        } catch {
+          return null;
+        }
+      },
+      set: async (key, value) => {
+        try {
+          localStorage.setItem(key, value);
+          return { key, value };
+        } catch {
+          return null;
+        }
+      },
+      del: async (key) => {
+        try {
+          localStorage.removeItem(key);
+          return { key, deleted: true };
+        } catch {
+          return null;
+        }
+      },
+    };
+
+    // ---------------- Regression helpers (no libs) ----------------
+    const MONTH_TO_NUM = {
+      January: 1, February: 2, March: 3, April: 4, May: 5, June: 6,
+      July: 7, August: 8, September: 9, October: 10, November: 11, December: 12
+    };
+    const NUM_TO_MONTH = {
+      1:"January",2:"February",3:"March",4:"April",5:"May",6:"June",
+      7:"July",8:"August",9:"September",10:"October",11:"November",12:"December"
+    };
+
+    function safeNum(x, fallback = 0) {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : fallback;
+    }
+    function monthNum(monthName) {
+      return MONTH_TO_NUM[monthName] || 1;
+    }
+    function ymKey(year, monthName) {
+      const m = monthNum(monthName);
+      return `${year}-${String(m).padStart(2, "0")}`;
+    }
+    function transpose(A) {
+      return A[0].map((_, j) => A.map(row => row[j]));
+    }
+    function matMul(A, B) {
+      const rows = A.length, cols = B[0].length, mid = B.length;
+      const out = Array.from({ length: rows }, () => Array(cols).fill(0));
+      for (let i = 0; i < rows; i++) {
+        for (let k = 0; k < mid; k++) {
+          const aik = A[i][k];
+          for (let j = 0; j < cols; j++) out[i][j] += aik * B[k][j];
+        }
+      }
+      return out;
+    }
+    function matVecMul(A, v) {
+      return A.map(row => row.reduce((s, x, i) => s + x * v[i], 0));
+    }
+    function identity(n) {
+      return Array.from({ length: n }, (_, i) =>
+        Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))
+      );
+    }
+    function invertMatrix(M) {
+      const n = M.length;
+      const A = M.map(r => r.slice());
+      const I = identity(n);
+
+      for (let col = 0; col < n; col++) {
+        let pivotRow = col;
+        for (let r = col + 1; r < n; r++) {
+          if (Math.abs(A[r][col]) > Math.abs(A[pivotRow][col])) pivotRow = r;
+        }
+        if (Math.abs(A[pivotRow][col]) < 1e-12) return null;
+
+        [A[col], A[pivotRow]] = [A[pivotRow], A[col]];
+        [I[col], I[pivotRow]] = [I[pivotRow], I[col]];
+
+        const pivot = A[col][col];
+        for (let j = 0; j < n; j++) {
+          A[col][j] /= pivot;
+          I[col][j] /= pivot;
+        }
+
+        for (let r = 0; r < n; r++) {
+          if (r === col) continue;
+          const factor = A[r][col];
+          for (let j = 0; j < n; j++) {
+            A[r][j] -= factor * A[col][j];
+            I[r][j] -= factor * I[col][j];
+          }
+        }
+      }
+      return I;
+    }
+    function fitOLS(X, y) {
+      const Xt = transpose(X);
+      const XtX = matMul(Xt, X);
+      const inv = invertMatrix(XtX);
+      if (!inv) return null;
+
+      const Xty = Xt.map(row => row.reduce((s, x, i) => s + x * y[i], 0));
+      const beta = matVecMul(inv, Xty);
+      return beta;
+    }
+
+    function aggregateMonthly(data) {
+      const byChannel = {};
+      for (const r of data) {
+        const ch = r.categorizedChannel || "Uncategorized";
+        const y = safeNum(r.year, new Date().getFullYear());
+        const mName = r.month || "January";
+        const key = ymKey(y, mName);
+
+        if (!byChannel[ch]) byChannel[ch] = {};
+        if (!byChannel[ch][key]) {
+          byChannel[ch][key] = { year: y, monthName: mName, spend: 0, leads: 0, color: r.channelColor || "#94a3b8" };
+        }
+        byChannel[ch][key].spend += safeNum(r.spend, 0);
+        byChannel[ch][key].leads += safeNum(r.leads, 0);
+      }
+
+      const out = {};
+      for (const [ch, obj] of Object.entries(byChannel)) {
+        out[ch] = Object.values(obj).sort((a,b) => ymKey(a.year,a.monthName).localeCompare(ymKey(b.year,b.monthName)));
+      }
+      return out;
+    }
+
+    // Spend ~ intercept + time + month dummies (Feb..Dec). PI ~ point ± 1.96*sigma
+    function forecastChannelSpend(monthlyArr, horizonMonths = 12) {
+      if (!monthlyArr || monthlyArr.length < 6) return null;
+
+      const n = monthlyArr.length;
+      const X = [];
+      const y = [];
+
+      for (let i = 0; i < n; i++) {
+        const m = monthNum(monthlyArr[i].monthName);
+        const row = [1, i]; // intercept + trend
+        for (let mm = 2; mm <= 12; mm++) row.push(mm === m ? 1 : 0);
+        X.push(row);
+        y.push(safeNum(monthlyArr[i].spend, 0));
+      }
+
+      const beta = fitOLS(X, y);
+      if (!beta) return null;
+
+      const yhat = X.map(r => r.reduce((s, x, j) => s + x * beta[j], 0));
+      const residuals = y.map((val, i) => val - yhat[i]);
+      const dof = Math.max(n - X[0].length, 1);
+      const sigma = Math.sqrt(residuals.reduce((s, e) => s + e * e, 0) / dof);
+      const z = 1.96;
+
+      const last = monthlyArr[monthlyArr.length - 1];
+      let startYear = safeNum(last.year, new Date().getFullYear());
+      let startMonth = monthNum(last.monthName);
+
+      const forecasts = [];
+      for (let h = 1; h <= horizonMonths; h++) {
+        const t = (n - 1) + h;
+        let m = startMonth + h;
+        let yYear = startYear;
+        while (m > 12) { m -= 12; yYear += 1; }
+
+        const row = [1, t];
+        for (let mm = 2; mm <= 12; mm++) row.push(mm === m ? 1 : 0);
+
+        const pred = row.reduce((s, x, j) => s + x * beta[j], 0);
+        const point = Math.max(0, pred);
+        const min = Math.max(0, point - z * sigma);
+        const max = Math.max(0, point + z * sigma);
+
+        forecasts.push({ year: yYear, month: m, monthName: NUM_TO_MONTH[m], point, min, max });
+      }
+
+      const annualPoint = forecasts.reduce((s, f) => s + f.point, 0);
+      const annualMin = forecasts.reduce((s, f) => s + f.min, 0);
+      const annualMax = forecasts.reduce((s, f) => s + f.max, 0);
+
+      return { annualPoint, annualMin, annualMax, sigma, forecasts };
+    }
+
+    // ---------------- Parsing helpers ----------------
+    function parseCSV(text) {
+      // Handles commas in quotes, CRLF, etc.
+      const rows = [];
+      const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(Boolean);
+      if (!lines.length) return rows;
+
+      const parseLine = (line) => {
+        const out = [];
+        let cur = "", inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"' ) {
+            if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+            else inQuotes = !inQuotes;
+          } else if (ch === "," && !inQuotes) {
+            out.push(cur); cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+        out.push(cur);
+        return out.map(s => s.trim());
+      };
+
+      const headers = parseLine(lines[0]).map(h => h.trim());
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseLine(lines[i]);
+        const obj = {};
+        headers.forEach((h, idx) => obj[h] = vals[idx] ?? "");
+        rows.push(obj);
+      }
+      return rows;
+    }
+
+    function normalizeRow(row) {
+      // allow multiple naming conventions
+      const channelCode = (row.channel_code ?? row.channelCode ?? row.code ?? row.ChannelCode ?? row.channel ?? row.Channel ?? "").toString().trim().toUpperCase();
+      const spendRaw = row.spend ?? row.budget ?? row.Spend ?? row.Budget ?? 0;
+      const leadsRaw = row.leads ?? row.conversions ?? row.Leads ?? row.Conversions ?? 0;
+      const month = (row.month ?? row.Month ?? row.date ?? row.Date ?? "January").toString().trim();
+      const year = safeNum(row.year ?? row.Year ?? new Date().getFullYear(), new Date().getFullYear());
+
+      return { channelCode, spend: safeNum(spendRaw, 0), leads: safeNum(leadsRaw, 0), month, year };
+    }
+
+    // ---------------- App ----------------
+    function MarketingAnalyticsDashboard() {
+      const [uploadedData, setUploadedData] = useState([]);
+      const [historicalData, setHistoricalData] = useState([]);
+      const [insights, setInsights] = useState(null);
+      const [isProcessing, setIsProcessing] = useState(false);
+      const [uploadStatus, setUploadStatus] = useState("");
+      const [activeView, setActiveView] = useState("upload");
+
+      const [channelMappings, setChannelMappings] = useState(DEFAULT_CHANNEL_MAPPINGS);
+      const [isEditingMappings, setIsEditingMappings] = useState(false);
+      const [editCode, setEditCode] = useState("");
+      const [editName, setEditName] = useState("");
+      const [editColor, setEditColor] = useState("#6366f1");
+
+      useEffect(() => {
+        (async () => {
+          const hist = await storage.get("marketing-historical-data");
+          if (hist?.value) {
+            try {
+              const data = JSON.parse(hist.value);
+              setHistoricalData(data);
+              if (Array.isArray(data) && data.length) generateInsights(data);
+            } catch {}
+          }
+
+          const map = await storage.get("custom-channel-mappings");
+          if (map?.value) {
+            try { setChannelMappings(JSON.parse(map.value)); } catch {}
+          }
+        })();
+      }, []);
+
+      async function saveCustomMappings(mappings) {
+        await storage.set("custom-channel-mappings", JSON.stringify(mappings));
+        setChannelMappings(mappings);
+        setUploadStatus("✓ Channel mappings saved");
+        setTimeout(() => setUploadStatus(""), 2000);
+      }
+
+      function addOrUpdateChannel() {
+        const code = editCode.trim().toUpperCase();
+        const name = editName.trim();
+        if (!code || !name) { alert("Please enter both channel code and name."); return; }
+
+        const newMappings = { ...channelMappings, [code]: { name, color: editColor } };
+        saveCustomMappings(newMappings);
+        setIsEditingMappings(false);
+        setEditCode(""); setEditName(""); setEditColor("#6366f1");
+      }
+
+      function deleteChannel(code) {
+        if (!confirm(`Delete channel ${code} - ${channelMappings[code]?.name || ""}?`)) return;
+        const newMappings = { ...channelMappings };
+        delete newMappings[code];
+        saveCustomMappings(newMappings);
+      }
+
+      function resetToDefaults() {
+        if (!confirm("Reset all channel mappings to defaults?")) return;
+        saveCustomMappings(DEFAULT_CHANNEL_MAPPINGS);
+      }
+
+      function categorizeData(rawRows) {
+        return rawRows.map((row) => {
+          const n = normalizeRow(row);
+
+          // IMPORTANT: show unmapped codes clearly (still keeps everything else same)
+          const mapped = channelMappings[n.channelCode];
+          const info = mapped ? mapped : { name: "Unmapped", color: "#ef4444" };
+
+          return {
+            ...row,
+            id: row.id || row.ID || `${Date.now()}_${Math.random()}`,
+            channel_code: n.channelCode,                  // ✅ keep raw Channel ID here
+            categorizedChannel: info.name,               // mapped label
+            channelColor: info.color,                    // mapped color (red if unmapped)
+            spend: n.spend,
+            leads: n.leads,
+            month: n.month,
+            year: n.year,
+          };
+        });
+      }
+
+      async function handleFileUpload(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsProcessing(true);
+        setUploadStatus("Reading file...");
+        try {
+          const text = await file.text();
+          let rows = [];
+
+          if (file.name.toLowerCase().endsWith(".csv")) rows = parseCSV(text);
+          else if (file.name.toLowerCase().endsWith(".json")) rows = JSON.parse(text);
+          else throw new Error("Unsupported file type. Please upload CSV or JSON.");
+
+          const processed = categorizeData(rows);
+          setUploadedData(processed);
+
+          const updatedHistory = [...historicalData, ...processed];
+          setHistoricalData(updatedHistory);
+          await storage.set("marketing-historical-data", JSON.stringify(updatedHistory));
+
+          generateInsights(updatedHistory);
+          setUploadStatus(`✓ Processed ${processed.length.toLocaleString()} records`);
+          setTimeout(() => setActiveView("insights"), 800);
+        } catch (err) {
+          setUploadStatus(`✗ ${err?.message || "Upload failed"}`);
+        } finally {
+          setIsProcessing(false);
+          e.target.value = ""; // allow re-upload same file
+        }
+      }
+
+      function computeChannelPerformance(leadsPerThousand) {
+        if (leadsPerThousand > 15) return "High";
+        if (leadsPerThousand > 5) return "Medium";
+        return "Low";
+      }
+
+      function generateInsights(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+          setInsights(null);
+          return;
+        }
+
+        const channelStats = {};
+        const channelIdMap = {}; // ✅ categorizedChannel -> Set(channel_code)
+
+        for (const r of data) {
+          const ch = r.categorizedChannel || "Unmapped";
+          const id = (r.channel_code || "UNKNOWN").toString().trim().toUpperCase();
+
+          if (!channelStats[ch]) {
+            channelStats[ch] = { totalSpend: 0, totalLeads: 0, records: [], color: r.channelColor || "#94a3b8" };
+          }
+          channelStats[ch].totalSpend += safeNum(r.spend, 0);
+          channelStats[ch].totalLeads += safeNum(r.leads, 0);
+          channelStats[ch].records.push(r);
+
+          if (!channelIdMap[ch]) channelIdMap[ch] = new Set();
+          channelIdMap[ch].add(id);
+        }
+
+        const monthlyByChannel = aggregateMonthly(data);
+
+        const channels = Object.entries(channelStats).map(([channel, stats]) => {
+          const totalSpend = stats.totalSpend;
+          const totalLeads = stats.totalLeads;
+
+          const costPerLead = totalLeads > 0 ? totalSpend / totalLeads : 0;
+          const leadsPerThousand = (totalLeads / (totalSpend / 1000)) || 0;
+          const performance = computeChannelPerformance(leadsPerThousand);
+
+          const spendValues = stats.records.map(r => safeNum(r.spend, 0)).filter(s => s > 0);
+          const historicalMin = spendValues.length ? Math.min(...spendValues) : 0;
+          const historicalMax = spendValues.length ? Math.max(...spendValues) : 0;
+
+          const monthlyArr = monthlyByChannel[channel] || [];
+          const fc = forecastChannelSpend(monthlyArr, 12);
+
+          let recommendedMin, recommendedMax, method;
+          if (fc) {
+            recommendedMin = fc.annualMin;
+            recommendedMax = fc.annualMax;
+            method = "Regression (Trend + Seasonality, 95% PI)";
+          } else {
+            const avgSpend = totalSpend / Math.max(stats.records.length, 1);
+            recommendedMin = avgSpend * 0.8;
+            recommendedMax = avgSpend * 1.5;
+            method = "Heuristic (Avg × Multiplier)";
+          }
+
+          return {
+            channel,
+            channelIDs: Array.from(channelIdMap[channel] || []).sort(), // ✅ show raw IDs in table
+            totalSpend,
+            totalLeads,
+            costPerLead,
+            roi: leadsPerThousand,
+            performance,
+            historicalMin,
+            historicalMax,
+            recommendedMin,
+            recommendedMax,
+            method,
+            color: stats.color,
+          };
+        }).sort((a,b) => b.roi - a.roi);
+
+        const years = data.map(d => safeNum(d.year, 0)).filter(Boolean);
+        const dateRange = {
+          from: years.length ? Math.min(...years) : new Date().getFullYear(),
+          to: years.length ? Math.max(...years) : new Date().getFullYear(),
+        };
+
+        const totalSpend = channels.reduce((s,c) => s + c.totalSpend, 0);
+        const totalLeads = channels.reduce((s,c) => s + c.totalLeads, 0);
+
+        setInsights({
+          channels,
+          totalRecords: data.length,
+          totalSpend,
+          totalLeads,
+          topChannel: channels[0] || null,
+          dateRange,
+        });
+      }
+
+      async function clearAllData() {
+        if (!confirm("Clear ALL historical data? This cannot be undone.")) return;
+        await storage.del("marketing-historical-data");
+        setHistoricalData([]);
+        setUploadedData([]);
+        setInsights(null);
+        setActiveView("upload");
+        setUploadStatus("✓ Cleared");
+        setTimeout(() => setUploadStatus(""), 1500);
+      }
+
+      function exportInsights() {
+        if (!insights) return;
+        const exportData = {
+          generated_at: new Date().toISOString(),
+          summary: {
+            totalRecords: insights.totalRecords,
+            totalSpend: insights.totalSpend,
+            totalLeads: insights.totalLeads,
+            dateRange: insights.dateRange,
+          },
+          channels: insights.channels.map(c => ({
+            channel: c.channel,
+            channel_ids: c.channelIDs,
+            totalSpend: c.totalSpend,
+            totalLeads: c.totalLeads,
+            costPerLead: c.costPerLead,
+            efficiency_leads_per_1k: c.roi,
+            performance: c.performance,
+            minBudget_next12m: c.recommendedMin,
+            maxBudget_next12m: c.recommendedMax,
+            method: c.method,
+          }))
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `marketing-insights-${new Date().toISOString().split("T")[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      const card = (bg, border) => ({
+        background: bg,
+        border: border,
+        borderRadius: "16px",
+        padding: "1.5rem",
+        backdropFilter: "blur(10px)",
+      });
+
+      const button = (active=false) => ({
+        padding: "0.625rem 1.25rem",
+        background: active ? "rgba(99, 102, 241, 0.2)" : "transparent",
+        border: active ? "1px solid #6366f1" : "1px solid rgba(148, 163, 184, 0.2)",
+        borderRadius: "8px",
+        color: "#e2e8f0",
+        fontSize: "0.875rem",
+        cursor: "pointer",
+        fontFamily: 'inherit',
+        fontWeight: 600,
+      });
+
+      return (
+        <div style={{
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)",
+          fontFamily: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          color: "#e2e8f0",
+        }}>
+          {/* Header */}
+          <div style={{
+            background: "rgba(15, 23, 42, 0.8)",
+            backdropFilter: "blur(10px)",
+            borderBottom: "1px solid rgba(99, 102, 241, 0.3)",
+            padding: "1.25rem 1.5rem",
+            position: "sticky",
+            top: 0,
+            zIndex: 50,
+          }}>
+            <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 46, height: 46,
+                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                  borderRadius: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 8px 16px rgba(99, 102, 241, 0.3)",
+                }}><TrendingUp /></div>
+                <div>
+                  <div style={{
+                    fontSize: "1.35rem",
+                    fontWeight: 800,
+                    background: "linear-gradient(90deg, #fff, #94a3b8)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    letterSpacing: "-0.5px",
+                  }}>Marketing Analytics Dashboard</div>
+                  <div style={{ fontSize: "0.875rem", color: "#94a3b8" }}>
+                    Regression Forecast (Trend + Seasonality) • Next 12 months
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button style={button(activeView==="upload")} onClick={() => setActiveView("upload")}>Upload Data</button>
+                <button style={button(activeView==="insights")} onClick={() => setActiveView("insights")} disabled={!insights}
+                  title={!insights ? "Upload data first" : ""}
+                >
+                  Insights
+                </button>
+                <button style={button(activeView==="mapping")} onClick={() => setActiveView("mapping")}>Channel Codes</button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ maxWidth: 1400, margin: "0 auto", padding: "1.5rem" }}>
+            {/* Status */}
+            {uploadStatus && (
+              <div style={{
+                marginBottom: "1rem",
+                padding: "0.75rem 1rem",
+                borderRadius: 10,
+                border: `1px solid ${uploadStatus.includes("✓") ? "rgba(16,185,129,0.35)" : "rgba(239,68,68,0.35)"}`,
+                background: uploadStatus.includes("✓") ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                color: uploadStatus.includes("✓") ? "#10b981" : "#ef4444",
+                fontSize: "0.9rem",
+              }}>
+                {uploadStatus}
+              </div>
+            )}
+
+            {/* Upload View */}
+            {activeView === "upload" && (
+              <div>
+                <div style={{
+                  background: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  borderRadius: 16,
+                  padding: "1.5rem",
+                  marginBottom: "1rem",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <AlertCircle />
+                    <div style={{ fontSize: "1.1rem", fontWeight: 800 }}>File format</div>
+                  </div>
+                  <div style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
+                    Required columns (CSV/JSON):
+                    <ul style={{ marginTop: 8 }}>
+                      <li><code>channel_code</code> (e.g., 001–013 or any custom code you add)</li>
+                      <li><code>spend</code> (or <code>budget</code>)</li>
+                      <li><code>leads</code> (or <code>conversions</code>)</li>
+                      <li><code>month</code> (January..December) and <code>year</code></li>
+                    </ul>
+                    Tip: regression needs at least <b>6 monthly points</b> per channel; 18+ is better.
+                  </div>
+                </div>
+
+                <div style={{
+                  position: "relative",
+                  background: "rgba(30, 41, 59, 0.35)",
+                  border: "2px dashed rgba(99, 102, 241, 0.45)",
+                  borderRadius: 18,
+                  padding: "3rem 1.25rem",
+                  textAlign: "center",
+                }}>
+                  <input type="file" accept=".csv,.json" onChange={handleFileUpload} disabled={isProcessing}
+                    style={{
+                      position: "absolute", inset: 0, width: "100%", height: "100%",
+                      opacity: 0, cursor: isProcessing ? "not-allowed" : "pointer"
+                    }}
+                  />
+                  <div style={{
+                    width: 76, height: 76, margin: "0 auto 1rem",
+                    borderRadius: 18,
+                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 10px 30px rgba(99, 102, 241, 0.3)"
+                  }}>
+                    <Upload />
+                  </div>
+                  <div style={{ fontSize: "1.35rem", fontWeight: 800 }}>
+                    {isProcessing ? "Processing..." : "Upload marketing data"}
+                  </div>
+                  <div style={{ color: "#94a3b8", marginTop: 6 }}>
+                    Click anywhere in this box to choose a CSV/JSON file.
+                  </div>
+                </div>
+
+                {historicalData.length > 0 && (
+                  <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <div style={{
+                      background: "rgba(30, 41, 59, 0.55)",
+                      border: "1px solid rgba(99, 102, 241, 0.3)",
+                      borderRadius: 16,
+                      padding: "1rem 1.25rem",
+                      color: "#cbd5e1",
+                    }}>
+                      <b style={{ color: "#e2e8f0" }}>{historicalData.length.toLocaleString()}</b> records loaded (saved in browser)
+                    </div>
+                    <button onClick={clearAllData} style={{
+                      padding: "0.6rem 1rem",
+                      borderRadius: 10,
+                      background: "rgba(239, 68, 68, 0.12)",
+                      border: "1px solid rgba(239, 68, 68, 0.35)",
+                      color: "#ef4444",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontWeight: 700,
+                    }}>
+                      Clear all data
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Insights View */}
+            {activeView === "insights" && insights && (
+              <div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14, marginBottom: 14 }}>
+                  <div style={card("linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.18))","1px solid rgba(99, 102, 241, 0.3)")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#cbd5e1" }}><DollarSign /> Total Spend</div>
+                    <div style={{ fontSize: "1.85rem", fontWeight: 900, marginTop: 8 }}>${insights.totalSpend.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div>
+                    <div style={{ color: "#94a3b8", marginTop: 6 }}>{insights.totalRecords.toLocaleString()} records</div>
+                  </div>
+
+                  <div style={card("linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.18))","1px solid rgba(16, 185, 129, 0.3)")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#cbd5e1" }}><TrendingUp /> Total Leads</div>
+                    <div style={{ fontSize: "1.85rem", fontWeight: 900, marginTop: 8 }}>{insights.totalLeads.toLocaleString("en-US")}</div>
+                    <div style={{ color: "#94a3b8", marginTop: 6 }}>
+                      ${ (insights.totalLeads ? (insights.totalSpend / insights.totalLeads) : 0).toFixed(2) } per lead
+                    </div>
+                  </div>
+
+                  <div style={card("linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(217, 119, 6, 0.18))","1px solid rgba(245, 158, 11, 0.3)")}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#cbd5e1" }}><BarChart3 /> Top Channel</div>
+                    <div style={{ fontSize: "1.85rem", fontWeight: 900, marginTop: 8 }}>{insights.topChannel ? insights.topChannel.channel : "—"}</div>
+                    <div style={{ color: "#94a3b8", marginTop: 6 }}>
+                      {insights.topChannel ? `${insights.topChannel.roi.toFixed(1)} leads / $1k` : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(139, 92, 246, 0.35)",
+                  borderRadius: 16,
+                  padding: "1.5rem",
+                  marginBottom: 14,
+                  boxShadow: "0 10px 40px rgba(139, 92, 246, 0.16)"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <Brain />
+                    <div style={{ fontSize: "1.2rem", fontWeight: 900 }}>Forecasted Budget Range (Next 12 Months)</div>
+                  </div>
+                  <div style={{ color: "#94a3b8" }}>
+                    Method is shown per channel. Regression requires enough monthly history; otherwise you will see a heuristic fallback.
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <button onClick={exportInsights} style={{
+                      padding: "0.75rem 1.25rem",
+                      background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                      border: "none",
+                      borderRadius: 10,
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontWeight: 800,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      boxShadow: "0 6px 18px rgba(99, 102, 241, 0.35)",
+                    }}>
+                      <Download /> Export Insights (JSON)
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: "rgba(30, 41, 59, 0.55)",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  borderRadius: 16,
+                  padding: "1.25rem",
+                  overflowX: "auto",
+                }}>
+                  <div style={{ fontSize: "1.2rem", fontWeight: 900, marginBottom: 12 }}>
+                    Channel Performance & Budget Allocation
+                  </div>
+
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120, fontSize: "0.9rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid rgba(99, 102, 241, 0.3)" }}>
+                        <th style={th("left")}>Channel</th>
+                        <th style={th("left")}>Channel IDs</th>
+                        <th style={th("right")}>Total Spend</th>
+                        <th style={th("right")}>Leads</th>
+                        <th style={th("right")}>Cost/Lead</th>
+                        <th style={th("right")}>Efficiency</th>
+                        <th style={th("center")}>Performance</th>
+                        <th style={th("right")}>Min Budget</th>
+                        <th style={th("right")}>Max Budget</th>
+                        <th style={th("left")}>Method</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {insights.channels.map((c, idx) => (
+                        <tr key={idx} style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.12)" }}>
+                          <td style={td("left")}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, boxShadow: `0 0 8px ${c.color}80` }}></span>
+                              <span style={{ fontWeight: 800 }}>{c.channel}</span>
+                            </div>
+                          </td>
+
+                          <td style={td("left")}>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxWidth: 340 }}>
+                              {c.channelIDs.map((id, i) => (
+                                <span
+                                  key={i}
+                                  style={{
+                                    background: id === "UNKNOWN" ? "rgba(239,68,68,0.12)" : "rgba(99,102,241,0.15)",
+                                    border: id === "UNKNOWN" ? "1px solid rgba(239,68,68,0.35)" : "1px solid rgba(99,102,241,0.35)",
+                                    borderRadius: 6,
+                                    padding: "2px 6px",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: id === "UNKNOWN" ? "#ef4444" : "#6366f1"
+                                  }}
+                                  title="Raw channel_code values found in your CSV"
+                                >
+                                  {id}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+
+                          <td style={td("right")}>${c.totalSpend.toLocaleString("en-US",{maximumFractionDigits:0})}</td>
+                          <td style={td("right")}>{c.totalLeads.toLocaleString("en-US")}</td>
+                          <td style={td("right")}>${c.costPerLead.toFixed(2)}</td>
+                          <td style={{ ...td("right"), fontWeight: 900 }}>{c.roi.toFixed(1)} / $1k</td>
+                          <td style={td("center")}>{badge(c.performance)}</td>
+                          <td style={{ ...td("right"), color: "#10b981", fontWeight: 900 }}>${c.recommendedMin.toLocaleString("en-US",{maximumFractionDigits:0})}</td>
+                          <td style={{ ...td("right"), color: "#8b5cf6", fontWeight: 900 }}>${c.recommendedMax.toLocaleString("en-US",{maximumFractionDigits:0})}</td>
+                          <td style={td("left")}>{c.method}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Mapping View */}
+            {activeView === "mapping" && (
+              <div style={{
+                background: "rgba(30, 41, 59, 0.55)",
+                border: "1px solid rgba(99, 102, 241, 0.3)",
+                borderRadius: 16,
+                padding: "1.5rem",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: "1.2rem", fontWeight: 900 }}>Custom Channel Mappings</div>
+                    <div style={{ color: "#94a3b8", marginTop: 4 }}>
+                      Add your own channel codes (numbers or text). Data will auto-categorize using this mapping.
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button onClick={() => setIsEditingMappings(true)} style={{
+                      padding: "0.6rem 1rem",
+                      background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                      border: "none",
+                      borderRadius: 10,
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontWeight: 900,
+                    }}>+ Add/Edit</button>
+                    <button onClick={resetToDefaults} style={{
+                      padding: "0.6rem 1rem",
+                      background: "rgba(239, 68, 68, 0.12)",
+                      border: "1px solid rgba(239, 68, 68, 0.35)",
+                      borderRadius: 10,
+                      color: "#ef4444",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      fontWeight: 900,
+                    }}>Reset defaults</button>
+                  </div>
+                </div>
+
+                {isEditingMappings && (
+                  <div style={{
+                    marginTop: 14,
+                    background: "rgba(99, 102, 241, 0.1)",
+                    border: "1px solid rgba(99, 102, 241, 0.25)",
+                    borderRadius: 12,
+                    padding: "1rem",
+                  }}>
+                    <div style={{ fontWeight: 900, marginBottom: 10 }}>Add / Update Channel</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+                      <div>
+                        <div style={label}>Channel Code</div>
+                        <input value={editCode} onChange={(e)=>setEditCode(e.target.value.toUpperCase())} placeholder="e.g., 014, GOOGLE, FB_ADS" style={input}/>
+                      </div>
+                      <div>
+                        <div style={label}>Channel Name</div>
+                        <input value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="e.g., Google Ads" style={input}/>
+                      </div>
+                      <div>
+                        <div style={label}>Color</div>
+                        <input type="color" value={editColor} onChange={(e)=>setEditColor(e.target.value)} style={{ ...input, height: 40, padding: 4 }}/>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+                      <button onClick={addOrUpdateChannel} style={{
+                        padding: "0.6rem 1rem",
+                        background: "linear-gradient(135deg, #10b981, #059669)",
+                        border: "none",
+                        borderRadius: 10,
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        fontWeight: 900,
+                      }}>Save</button>
+                      <button onClick={()=>{ setIsEditingMappings(false); setEditCode(""); setEditName(""); setEditColor("#6366f1"); }} style={{
+                        padding: "0.6rem 1rem",
+                        background: "transparent",
+                        border: "1px solid rgba(148, 163, 184, 0.3)",
+                        borderRadius: 10,
+                        color: "#cbd5e1",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        fontWeight: 900,
+                      }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 14, color: "#cbd5e1" }}>
+                  <b style={{ color:"#e2e8f0" }}>{Object.keys(channelMappings).length}</b> channels configured
+                </div>
+
+                <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 10 }}>
+                  {Object.entries(channelMappings)
+                    .sort((a,b)=>a[0].localeCompare(b[0]))
+                    .map(([code, info]) => (
+                      <div key={code} style={{
+                        background: `linear-gradient(135deg, ${info.color}1f, ${info.color}0f)`,
+                        border: `1px solid ${info.color}40`,
+                        borderRadius: 12,
+                        padding: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{
+                            width: 44, height: 44,
+                            borderRadius: 10,
+                            background: info.color,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#fff",
+                            fontWeight: 900,
+                            fontSize: 12,
+                          }}>{code}</div>
+                          <div>
+                            <div style={{ fontWeight: 900 }}>{info.name}</div>
+                            <div style={{ color: "#94a3b8", fontSize: 12 }}>Code: {code}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button onClick={()=>{ setEditCode(code); setEditName(info.name); setEditColor(info.color); setIsEditingMappings(true);}}
+                            style={miniBtn("rgba(99,102,241,0.18)","rgba(99,102,241,0.35)","#6366f1")}
+                            title="Edit">✏️</button>
+                          <button onClick={()=>deleteChannel(code)}
+                            style={miniBtn("rgba(239,68,68,0.18)","rgba(239,68,68,0.35)","#ef4444")}
+                            title="Delete">🗑️</button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                <div style={{
+                  marginTop: 16,
+                  background: "rgba(15, 23, 42, 0.75)",
+                  border: "1px solid rgba(148, 163, 184, 0.2)",
+                  borderRadius: 12,
+                  padding: "1rem",
+                  color: "#cbd5e1",
+                  overflow: "auto",
+                }}>
+                  <div style={{ fontWeight: 900, marginBottom: 8 }}>Example CSV</div>
+                  <pre style={{ margin: 0, fontSize: 13 }}>
+{`id,channel_code,spend,leads,month,year
+1,005,50000,250,January,2024
+2,008,35000,180,January,2024
+3,006,12000,95,February,2024
+4,GOOGLE,45000,220,March,2024`}
+                  </pre>
+                  <div style={{ color: "#94a3b8", marginTop: 8, fontSize: 12 }}>
+                    Note: Any channel_code not mapped will appear as <b style={{ color: "#ef4444" }}>Unmapped</b> in Insights.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <style>{`
+            button:disabled { opacity: 0.55; cursor: not-allowed; }
+            tr:hover { background: rgba(99, 102, 241, 0.05); }
+            code { background: rgba(99,102,241,0.15); padding: 2px 6px; border-radius: 6px; }
+          `}</style>
+        </div>
+      );
+    }
+
+    // small style helpers used above (outside component)
+    const th = (align) => ({
+      padding: "0.9rem",
+      textAlign: align,
+      color: "#cbd5e1",
+      fontWeight: 800,
+      textTransform: "uppercase",
+      fontSize: "0.75rem",
+      letterSpacing: "0.5px",
+      whiteSpace: "nowrap",
+    });
+    const td = (align) => ({
+      padding: "0.9rem",
+      textAlign: align,
+      color: "#cbd5e1",
+      whiteSpace: "nowrap",
+      verticalAlign: "top",
+    });
+    const badge = (perf) => {
+      const cfg = perf === "High"
+        ? { bg: "rgba(16,185,129,0.18)", bd: "rgba(16,185,129,0.35)", fg: "#10b981" }
+        : perf === "Medium"
+        ? { bg: "rgba(245,158,11,0.18)", bd: "rgba(245,158,11,0.35)", fg: "#f59e0b" }
+        : { bg: "rgba(239,68,68,0.18)", bd: "rgba(239,68,68,0.35)", fg: "#ef4444" };
+
+      return (
+        <span style={{
+          padding: "0.25rem 0.75rem",
+          borderRadius: 999,
+          fontSize: "0.75rem",
+          fontWeight: 900,
+          background: cfg.bg,
+          border: `1px solid ${cfg.bd}`,
+          color: cfg.fg,
+          display: "inline-block",
+          minWidth: 74,
+        }}>{perf}</span>
+      );
+    };
+    const label = { color: "#cbd5e1", fontSize: 13, marginBottom: 6, fontWeight: 800 };
+    const input = {
+      width: "100%",
+      padding: "0.6rem 0.7rem",
+      background: "rgba(15, 23, 42, 0.85)",
+      border: "1px solid rgba(148, 163, 184, 0.25)",
+      borderRadius: 10,
+      color: "#e2e8f0",
+      outline: "none",
+      boxSizing: "border-box",
+      fontFamily: 'inherit',
+      fontWeight: 700,
+    };
+    const miniBtn = (bg, bd, fg) => ({
+      padding: "0.5rem 0.55rem",
+      background: bg,
+      border: `1px solid ${bd}`,
+      borderRadius: 10,
+      color: fg,
+      cursor: "pointer",
+      fontFamily: "inherit",
+      fontWeight: 900,
+    });
+
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<MarketingAnalyticsDashboard />);
+  </script>
+</body>
+</html>
